@@ -1,4 +1,4 @@
-#K3s on Jetson Board with GPU Allocation 
+# K3s on Jetson Board with GPU Allocation 
 
 Created by Jack Liang
 
@@ -21,7 +21,7 @@ Getting to know our Jetson board is important for this exercise. Because at the 
 Second, install/run K3s:
 `curl -sfL https://get.k3s.io | sh -s - --docker` (refer to https://k3s.io/ but add the “--docker”). This also installs kubectl, so no need to install kubectl separately. The “--docker” part allows K3s to access local docker images instead of only pulling from registries. After this is done, we should see our K3s node with `sudo k3s kubectl get node`.
 
-##Docker Compose to K8s 
+## Docker Compose to K8s 
 Next, we want to convert the docker-compose files to K8s YAML files. Install Kompose then create an .env file from the environment variables you use for the docker-compose files. Run `docker-compose -f docker-compose.file.of.conversion.interest.yml config > docker-compose-output.yml` to create a temporary docker-compose file with all environment variables substituted in from the .env file. Modify the docker-compose-output.yml as follows: Remove any instances of "device_requests" that's for allocation of GPU when running Docker Compose (this is now useless in K3s for requesting GPU resource, plus conversion won’t work with “device_requests”) and change the docker-compose version from “3” to “3.7” → 
 
 Now run `kompose convert -f docker-compose-output.yml --volumes hostPath`. Notice all the K8s service and deployment files generated from the Docker Compose services.
@@ -30,7 +30,7 @@ The “--volumes hostPath” option maps the K3s pod volumes to our Jetson board
    
 Let’s run `sudo k3s kubectl apply -f ./example-deployment.yaml`. You should see the deployment running with `sudo k3s kubectl get pods`.  You can also see the logs by `sudo k3s kubectl logs -f xxx`. 
 
-##Solving Node Disk Pressure Taint 
+## Solving Node Disk Pressure Taint 
 Before we go any further, let’s take a detour and talk about the potential disk pressure problem. If your Jetson board is already loaded with docker images, chances are that upon restarting the Jetson board,
 you will see "Taints: node.kubernetes.io/disk-pressure:NoSchedule” in the description of `sudo k3s kubectl describe node`. To resolve, first `df -h` to see which drive mount is almost full. According to https://kubernetes.io/docs/concepts/scheduling-eviction/node-pressure-eviction/ in human terms, when the mounted drive at which `kubelet` is installed in gets less than 10% disk space, pods will be hard-evicted or killed un-gracefully. To amend this issue, we need to move kubelet to a more hospitable habitat. Perform the following: 
 
@@ -44,7 +44,7 @@ sudo systemctl restart kubelet
 ```
 If the `systemctl` restart doesn’t work, simply restart the Jetson board by power. `sudo k3s kubectl describe node` and you should see everything normal again.  
 
-##Granting GPU Access
+## Granting GPU Access
 Back to our regular scheduled guide. Right now if you deploy the YAML file again then run `jtop` immediately, watch and you’ll see there's no GPU activity whatsoever. What we now need to do is request GPU resource from within the K3s pod. But first, let’s make sure that we can communicate with the Jetson board GPU. `docker pull jitteam/devicequery` then `sudo k3s kubectl run -i -t nvidia --image=jitteam/devicequery --restart=Never` → 
 ```
 CUDA Device Query (Runtime API) version (CUDART static linking)
@@ -177,7 +177,7 @@ $ sudo k3s kubectl apply -f nvidia-device-plugin.yml
 ```
 We will be able to deploy k8s-device-plugin. Now that we `sudo k3s kubectl describe node`, we will see "nvidia.com/gpu 0 0" under "Allocated resources:", where it wasn't there before.  Now deploy the deployment YAML file again with “resources” added to "containers" as in above and run `jtop` immediately, watch and you will see some GPU activity at the start, whereas if you don’t add “resources” to "containers" there would be no GPU activity shown at all. Also, by `sudo k3s kubectl describe node` now we will see "nvidia.com/gpu 1 1".  
 
-##Epilogue
+## Epilogue
 Currently, in order to share GPU resource to more than one Docker Compose service in K8s/K3s, we must put these services in the same K8s deployment YAML file, since multi-deployment GPU sharing/concurrency is currently not supported with k8s-device-plugin. So deploying two deployments together with GPU resource `limits: nvidia.com/gpu: "1"` will yield “0/1 nodes are available: 1 Insufficient nvidia.com/gpu.” for one of them and will remain so until the one with GPU is deleted. 
 
 Helpful links for resolving the GPU concurrency issue: 
