@@ -4,7 +4,7 @@ Created by Jack Liang
 
 >Disclaimer: Due to internet blockade in China (and maybe running inside SSH/Jetson board), downloading remains unreliable. If any curl, apt, git, etc commands fail or hang, TRY again. And again. If the repeating of waiting and trying does’t work, change the mirrors or resort to SCP.
  
-Go through Set up Networking in Jetson Board. 
+Go through https://github.com/jliang87/jetson/blob/master/set-up-networking-in-jetson.md if needed. 
 
 First `git clone https://github.com/jetsonhacks/jetsonUtilities`, then `cd` into the directory and `python3 jetsonInfo.py`.
 
