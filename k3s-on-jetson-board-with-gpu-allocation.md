@@ -1,4 +1,4 @@
-#K3s on Jetson Board with GPU Allocation 
+# K3s on Jetson Board with GPU Allocation 
 
 Created by Jack Liang
 
@@ -21,7 +21,7 @@ Getting to know our Jetson board is important for this exercise. Because at the 
 Second, install/run K3s:
 `curl -sfL https://get.k3s.io | sh -s - --docker` (refer to https://k3s.io/ but add the “--docker”). This also installs kubectl, so no need to install kubectl separately. The “--docker” part allows K3s to access local docker images instead of only pulling from registries. After this is done, we should see our K3s node with `sudo k3s kubectl get node`.
 
-##Docker Compose to K8s 
+## Docker Compose to K8s 
 Next, we want to convert the docker-compose files to K8s YAML files. Install Kompose then create an .env file from the environment variables you use for the docker-compose files. Run `docker-compose -f docker-compose.file.of.conversion.interest.yml config > docker-compose-output.yml` to create a temporary docker-compose file with all environment variables substituted in from the .env file. Modify the docker-compose-output.yml as follows: Remove any instances of "device_requests" that's for allocation of GPU when running Docker Compose (this is now useless in K3s for requesting GPU resource, plus conversion won’t work with “device_requests”) and change the docker-compose version from “3” to “3.7” → 
 
 Now run `kompose convert -f docker-compose-output.yml --volumes hostPath`. Notice all the K8s service and deployment files generated from the Docker Compose services.
@@ -30,7 +30,7 @@ The “--volumes hostPath” option maps the K3s pod volumes to our Jetson board
    
 Let’s run `sudo k3s kubectl apply -f ./example-deployment.yaml`. You should see the deployment running with `sudo k3s kubectl get pods`.  You can also see the logs by `sudo k3s kubectl logs -f xxx`. 
 
-##Solving Node Disk Pressure Taint 
+## Solving Node Disk Pressure Taint 
 Before we go any further, let’s take a detour and talk about the potential disk pressure problem. If your Jetson board is already loaded with docker images, chances are that upon restarting the Jetson board,
 you will see "Taints: node.kubernetes.io/disk-pressure:NoSchedule” in the description of `sudo k3s kubectl describe node`. To resolve, first `df -h` to see which drive mount is almost full. According to https://kubernetes.io/docs/concepts/scheduling-eviction/node-pressure-eviction/ in human terms, when the mounted drive at which `kubelet` is installed in gets less than 10% disk space, pods will be hard-evicted or killed un-gracefully. To amend this issue, we need to move kubelet to a more hospitable habitat. Perform the following: 
 
@@ -44,7 +44,7 @@ sudo systemctl restart kubelet
 ```
 If the `systemctl` restart doesn’t work, simply restart the Jetson board by power. `sudo k3s kubectl describe node` and you should see everything normal again.  
 
-##Granting GPU Access
+## Granting GPU Access
 Back to our regular scheduled guide. Right now if you deploy the YAML file again then run `jtop` immediately, watch and you’ll see there's no GPU activity whatsoever. What we now need to do is request GPU resource from within the K3s pod. But first, let’s make sure that we can communicate with the Jetson board GPU. `docker pull jitteam/devicequery` then `sudo k3s kubectl run -i -t nvidia --image=jitteam/devicequery --restart=Never` → 
 ```
 CUDA Device Query (Runtime API) version (CUDART static linking)
@@ -177,10 +177,58 @@ $ sudo k3s kubectl apply -f nvidia-device-plugin.yml
 ```
 We will be able to deploy k8s-device-plugin. Now that we `sudo k3s kubectl describe node`, we will see "nvidia.com/gpu 0 0" under "Allocated resources:", where it wasn't there before.  Now deploy the deployment YAML file again with “resources” added to "containers" as in above and run `jtop` immediately, watch and you will see some GPU activity at the start, whereas if you don’t add “resources” to "containers" there would be no GPU activity shown at all. Also, by `sudo k3s kubectl describe node` now we will see "nvidia.com/gpu 1 1".  
 
-##Epilogue
+## Epilogue
 Currently, in order to share GPU resource to more than one Docker Compose service in K8s/K3s, we must put these services in the same K8s deployment YAML file, since multi-deployment GPU sharing/concurrency is currently not supported with k8s-device-plugin. So deploying two deployments together with GPU resource `limits: nvidia.com/gpu: "1"` will yield “0/1 nodes are available: 1 Insufficient nvidia.com/gpu.” for one of them and will remain so until the one with GPU is deleted. 
 
 Helpful links for resolving the GPU concurrency issue: 
 - https://github.com/NVIDIA/k8s-device-plugin/issues/169
 - https://aws.amazon.com/blogs/opensource/virtual-gpu-device-plugin-for-inference-workload-in-kubernetes/
+<<<<<<< HEAD
 - https://github.com/Deepomatic/shared-gpu-nvidia-k8s-device-plugin
+=======
+- https://github.com/Deepomatic/shared-gpu-nvidia-k8s-device-plugin
+
+
+
+
+
+Set up Networking in Jetson Board
+
+Created by jack.liang
+Last updated: yesterday at 9:55 AM4 min read
+First, go through MacOS Network Environment Setup
+
+Preface: The file /etc/network/interfaces.d/eth0 in Jetson board will be referred to as eth0 interface file.
+To enable SSH into Jetson boards while v2ray is on, choose “Routing” by clicking on the >> button next to “Subscribe”, then in “Direct”, add an IP appended with /24 as netmask to allow subnetting. For example add “192.168.2.0/24“ for Jetson board IP’s 192.168.2.2 and 192.168.2.3. 
+If there is no internet connection in Jetson board by following any of the instructions below, try sudo vi /etc/resolv.conf and set the IP to 8.8.8.8, which is the Google DNS. This takes effect immediately without the need to restart Jetson board or its networking.  
+There are three ways of doing this: 
+Direct Ethernet by Cable: Connect the ends of an ethernet cable to one of office’s ethernet ports and a Jetson board respectively. Then set the eth0 interface file: 
+
+
+1auto eth0
+2iface eth0 inet dhcp
+sudo /etc/init.d/networking restart or restart Jetson board by power switch then do ifconfig to see the DHCP-assigned eth0 inet IP (do sudo dhclient -r eth0 && sudo dhclient eth0 if no “eth0” shows up). 
+In Mac, One should be able to ping that IP and SSH into it by ssh caper@x.x.x.x/youknowthepassword.
+I encountered many download errors due to no connection to download URL with this approach. This can be amended by referring to Shadowsocks and v2ray Ubuntu (scroll to bottom for easiest approach), Dockerhub China mirror, How to set the Proxy for Docker on Ubuntu - Serverlab, along with setting up apt and k8s related mirrors. I found this approach tedious and finicky and didn’t worth my while, maybe for you it’d be different. 
+If the Jetson board eth0 IP is not ping-able and the Mac is connected to an adaptor/dongle (like for external monitor), do ifconfig and see if you have an “bridge100” or the like and do sudo ifconfig bridge100 down. This happens when your Mac has previously connected to devices (like a Jetson board!) via an ethernet cable hooked up to an adaptor/dongle with ethernet port (see below) and the Jetson board eth0 inet IP is in the same subnet as the bridge100 inet IP. 
+DHCP from Mac WIFI Sharing: Connect the ends of an ethernet cable to a Mac (via adaptor/dongle) and a Jetson board respectively. Then in Mac’s “Preferences” → “Network”, choose the adaptor/dongle settings in the left pane labeled in the likes of “USB10/100/100LAN“, set the “Configure IPv4” to “Using DHCP” and let it auto configure then save. Then in “Preferences” → “Sharing” → enable “Internet Sharing” (left pane) and share WIFI with the likes of “USB10/100/100LAN“.  In the Jetson board, set the eth0 interface file: 
+
+
+1auto eth0
+2iface eth0 inet dhcp
+sudo /etc/init.d/networking restart or restart Jetson board by power switch then do ifconfig to see the DHCP-assigned eth0 inet IP (do sudo dhclient -r eth0 && sudo dhclient eth0 if no “eth0” shows up). The DHCP-assigned eth0 inet IP should be plus-one of the last digit of the bridge100 inet IP in Mac, which is usually 192.168.2.1. So the first Jetson board IP should be 192.168.2.2, after that 192.168.2.3, and so on. (One can check in Mac by brew install nmap then sudo nmap -n -sP 192.168.2.1/24) 
+The upside of this approach is that there are much fewer download problems. However, after using this approach for a while I encountered a problem with one of the Jetson boards having no eth0 upon start up. Therefore, I needed to connect HDMI cable to said board and log in with keyboard and do sudo dhclient -r eth0 && sudo dhclient eth0 before being able to SSH into it. After a while this became a nuisance and begged for the better way below. 
+Static IP with DHCP from Mac WIFI Sharing: Simply comment out the iface eth0 inet dhcp in eth0 interface file and change the content to:
+
+
+1auto eth0
+2iface eth0 inet static
+3address 192.168.2.2 
+4netmask 255.255.255.0
+5gateway 192.168.2.1
+6#iface eth0 inet dhcp
+Note the “address” is the one that DHCP assigned (so use 192.168.2.3 for the other Jetson board), and the “gateway” is the bridge100 inet IP in Mac. Restart to take effect and now the connection should be as stable as the smooth sea in the quiet night ready for sail. 
+Note: According to tutorials like Share a Mac's Internet Connection with a Raspberry Pi, static addresses in eth0 interface file are configured with Mac’s “Preferences” → “Network” → “USB10/100/100LAN“ → “Configure IPv4” → “Manually” instead of “Using DHCP“, but since we set the static addresses to be the same as what DHCP assigned, both ways work.
+
+Disclaimer: None of the above approaches let the Jetson boards override the Chinese internet blockade by default, even with v2ray on in Mac. I have been able to install packages like Kubectl (Install and Set Up kubectl on Linux) which connects to Google mirrors and then a couple weeks later found the mirrors to be completely blocked, which questioned my sanity. Another problem I encountered is with apt, with one Jetson board able to install and the other fails with “Network is unreachable”. Check out what’s in /etc/apt/apt.conf of the problematic board or simply do echo | sudo tee /etc/apt/apt.conf to fix the issue.
+>>>>>>> 4b2c1ba8e303d4beaa94c1374ebbdaf2dcccdfac
