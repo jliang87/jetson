@@ -16,7 +16,7 @@ Ubuntu 18.04.4 LTS
 Kernel Version: 4.9.140-tegra
 ...
 ```
-Getting to know our Jetson board is important for this exercise. Because at the point of writing of this guide, https://github.com/NVIDIA/k8s-device-plugin which is for exposing the number of GPU's on each node in a k8s cluster and keeping track of the health of GPUs, has only recently started officially supporting ARM64 (https://github.com/NVIDIA/k8s-device-plugin/commit/cde4e1a1dcdf75f60eb5de488a72007ad61d8443). Not only are our Jetson boards on ARM64, they are also Jetson Xavier NX boards, which is Tegra architecture. We will refer back to these details later on; getting to know these details prior to starting off avoids all the kerfuffle in preparing for this guide. 
+Getting to know your Jetson board is important for this exercise. Because at the point of writing of this guide, https://github.com/NVIDIA/k8s-device-plugin which is for exposing the number of GPU's on each node in a k8s cluster and keeping track of the health of GPUs, has only recently started officially supporting ARM64 (https://github.com/NVIDIA/k8s-device-plugin/commit/cde4e1a1dcdf75f60eb5de488a72007ad61d8443). Not only is your Jetson board on ARM64, they are also Jetson Xavier NX boards, which is Tegra architecture. We will refer back to these details later on; getting to know these details prior to starting off avoids all the kerfuffle in preparing for this guide. 
 
 Second, install/run K3s:
 `curl -sfL https://get.k3s.io | sh -s - --docker` (refer to https://k3s.io/ but add the “--docker”). This also installs kubectl, so no need to install kubectl separately. The “--docker” part allows K3s to access local docker images instead of only pulling from registries. After this is done, we should see our K3s node with `sudo k3s kubectl get node`.
@@ -26,7 +26,7 @@ Next, we want to convert the docker-compose files to K8s YAML files. Install Kom
 
 Now run `kompose convert -f docker-compose-output.yml --volumes hostPath`. Notice all the K8s service and deployment files generated from the Docker Compose services.
 To learn more about the generated YAML files, visit https://www.youtube.com/watch?v=qmDzcu5uY1I. 
-The “--volumes hostPath” option maps the K3s pod volumes to our Jetson board. We will now use a K8s deployment file to create a K3s node.
+The “--volumes hostPath” option maps the K3s pod volumes to your Jetson board. We will now use a K8s deployment file to create a K3s node.
    
 Let’s run `sudo k3s kubectl apply -f ./example-deployment.yaml`. You should see the deployment running with `sudo k3s kubectl get pods`.  You can also see the logs by `sudo k3s kubectl logs -f xxx`. 
 
