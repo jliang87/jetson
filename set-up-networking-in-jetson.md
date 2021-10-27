@@ -12,7 +12,7 @@ auto eth0
 iface eth0 inet dhcp
 ```
 `sudo /etc/init.d/networking restart` or restart Jetson board by power then do `ifconfig` to see the DHCP-assigned eth0 inet IP (do `sudo dhclient -r eth0 && sudo dhclient eth0` if no “eth0” shows up). 
-In Mac, one should be able to ping that IP and SSH into it by ssh user@x.x.x.x/password.
+In Mac, one should be able to ping that IP and SSH into it by `ssh user@x.x.x.x/password`.
 
 I encountered many download errors due to no connection to download URL with this approach. This can be amended by installing the likes of Shadowsocks and V2Ray, setting up Dockerhub China mirror, https://www.serverlab.ca/tutorials/containers/docker/how-to-set-the-proxy-for-docker-on-ubuntu/, along with apt and K8s related mirrors. I found this approach tedious and finicky and didn’t worth my while, maybe for you it’d be different. 
 
